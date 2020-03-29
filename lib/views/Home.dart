@@ -27,7 +27,9 @@ class Home extends StatefulWidget {
 ///
 class _HomeState extends State<Home> {
   final Config _config = Config();
-  StreamController<Map<String, dynamic>> _streamController;
+  final Map<String, dynamic> packs = {};
+  StreamController<bool> _streamController;
+  SharedPreferences prefs;
 
   ///
   ///
@@ -43,14 +45,13 @@ class _HomeState extends State<Home> {
   ///
   ///
   void _loadData() async {
+    prefs = await SharedPreferences.getInstance();
+
     Map<String, dynamic> data = await MetricHttpClient.doCall(
-        endpoint: '/users/5e80b4d432c450583d46076e/tags?limit=9999');
+      endpoint: '/users/5e80b4d432c450583d46076e/tags?limit=9999',
+    );
 
-    List tags = List.from(json.decode(data['body']));
-
-    print('Tags: ${tags.length}');
-
-    Map<String, dynamic> packs = {};
+    List tags = json.decode(data['body']);
 
     List<Map<String, dynamic>> emptyPack = [];
 
@@ -66,6 +67,10 @@ class _HomeState extends State<Home> {
             packs[packName] = pack;
           }
           packs[packName]['tags'].add(tag);
+
+          packs[packName]['open'] = prefs.containsKey(packs[packName]['id'])
+              ? prefs.getBool(packs[packName]['id'])
+              : false;
         }
       }
     } catch (exception) {
@@ -73,13 +78,17 @@ class _HomeState extends State<Home> {
     }
 
     packs[lastPack] = {
-      'name': lastPack,
+      'id': lastPack,
+      'name': 'Other Tags',
       'tags': emptyPack,
+      'open': false,
     };
+
+    // TODO - Continue...
 
     print('Packs: $packs');
 
-    _streamController.add(packs);
+    _streamController.add(true);
   }
 
   ///
@@ -114,20 +123,40 @@ class _HomeState extends State<Home> {
                 : MediaQuery.of(context).size.width,
             height: double.infinity,
             child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: StreamBuilder<Map<String, dynamic>>(
-                  stream: _streamController.stream,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      Map<String, dynamic> packs = snapshot.data;
-
-                      return Text('Packs: ${packs.length}');
+              child: StreamBuilder<bool>(
+                stream: _streamController.stream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    if (snapshot.data) {
+                      List<String> keys = packs.keys.toList();
+                      return ListView.separated(
+                        itemBuilder: (context, index) {
+                          Map<String, dynamic> pack = packs[keys[index]];
+                          return ListTile(
+                            leading: Icon(pack['open']
+                                ? Icons.keyboard_arrow_down
+                                : Icons.chevron_right),
+                            title: Text(pack['name'] ?? 'ERROR'),
+                            subtitle: pack['open'] ? Text(pack['id']) : null,
+                            onTap: () {
+                              pack['open'] = !pack['open'];
+                              prefs.setBool(pack['id'], pack['open']);
+                              _streamController.add(true);
+                            },
+                          );
+                        },
+                        separatorBuilder: (context, index) => Container(
+                          width: double.infinity,
+                          height: 1,
+                          color: Colors.black26,
+                        ),
+                        itemCount: keys.length,
+                      );
                     }
+                  }
 
-                    return WaitingMessage('Aguarde...');
-                  },
-                ),
+                  return WaitingMessage('Aguarde...');
+                },
               ),
             ),
           ),
@@ -143,7 +172,6 @@ class _HomeState extends State<Home> {
   ///
   ///
   void _singOut() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
     await Navigator.of(context).pushAndRemoveUntil(
