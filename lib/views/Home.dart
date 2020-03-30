@@ -48,18 +48,44 @@ class _HomeState extends State<Home> {
     prefs = await SharedPreferences.getInstance();
 
     Map<String, dynamic> data = await MetricHttpClient.doCall(
-      endpoint: '/users/5e80b4d432c450583d46076e/tags?limit=9999',
+      endpoint: '/users/${_config.userId}/links?limit=9999',
+      log: false,
     );
 
-    List tags = json.decode(data['body']);
+    List links = json.decode(data['body']);
 
-    List<Map<String, dynamic>> emptyPack = [];
+    List<Map<String, dynamic>> linksWithoutTag = [];
+
+    List<Map<String, dynamic>> tagsWithoutPack = [];
+
+    Map<String, dynamic> tags = {};
 
     try {
-      for (Map<String, dynamic> tag in tags) {
+      for (Map<String, dynamic> link in links) {
+        List internalTags = link.remove('tags');
+        if (internalTags == null || internalTags.isEmpty) {
+          linksWithoutTag.add(link);
+        } else {
+          for (Map<String, dynamic> tag in internalTags) {
+            String tagName = tag['name'];
+            if (!tags.containsKey(tagName)) {
+              tag['links'] = [];
+              tags[tagName] = tag;
+            }
+            tags[tagName]['links'].add(link);
+
+            tags[tagName]['open'] = prefs.containsKey(tags[tagName]['id'])
+                ? prefs.getBool(tags[tagName]['id'])
+                : false;
+          }
+        }
+      }
+
+      for (String key in tags.keys) {
+        Map<String, dynamic> tag = tags[key];
         Map<String, dynamic> pack = tag.remove('pack');
         if (pack == null) {
-          emptyPack.add(tag);
+          tagsWithoutPack.add(tag);
         } else {
           String packName = pack['name'];
           if (!packs.containsKey(packName)) {
@@ -78,15 +104,13 @@ class _HomeState extends State<Home> {
     }
 
     packs[lastPack] = {
-      'id': lastPack,
+      'id': 'pack_$lastPack',
       'name': 'Other Tags',
-      'tags': emptyPack,
+      'tags': tagsWithoutPack,
       'open': false,
     };
 
-    // TODO - Continue...
-
-    print('Packs: $packs');
+//    print('Packs: $packs');
 
     _streamController.add(true);
   }
@@ -133,11 +157,19 @@ class _HomeState extends State<Home> {
                         itemBuilder: (context, index) {
                           Map<String, dynamic> pack = packs[keys[index]];
                           return ListTile(
-                            leading: Icon(pack['open']
-                                ? Icons.keyboard_arrow_down
-                                : Icons.chevron_right),
-                            title: Text(pack['name'] ?? 'ERROR'),
-                            subtitle: pack['open'] ? Text(pack['id']) : null,
+                            leading: Icon(
+                              pack['open']
+                                  ? Icons.keyboard_arrow_down
+                                  : Icons.keyboard_arrow_right,
+                            ),
+                            title: Padding(
+                              padding: EdgeInsets.only(
+                                top: pack['open'] ? 16.0 : 0.0,
+                              ),
+                              child: Text(pack['name'] ?? 'ERROR'),
+                            ),
+                            subtitle:
+                                pack['open'] ? _getTags(pack['tags']) : null,
                             onTap: () {
                               pack['open'] = !pack['open'];
                               prefs.setBool(pack['id'], pack['open']);
@@ -164,6 +196,60 @@ class _HomeState extends State<Home> {
             child: Container(),
           ),
         ],
+      ),
+    );
+  }
+
+  ///
+  ///
+  ///
+  Widget _getTags(List tags) {
+    return Column(
+      children: tags.map(
+        (tag) {
+          return ListTile(
+            leading: Icon(
+              tag['open']
+                  ? Icons.keyboard_arrow_down
+                  : Icons.keyboard_arrow_right,
+            ),
+            title: Padding(
+              padding: EdgeInsets.only(
+                top: tag['open'] ? 16.0 : 0.0,
+              ),
+              child: Text(tag['name']),
+            ),
+            subtitle: tag['open'] ? _getLinks(tag['links']) : null,
+            onTap: () {
+              tag['open'] = !tag['open'];
+              prefs.setBool(tag['id'], tag['open']);
+              _streamController.add(true);
+            },
+          );
+        },
+      ).toList(),
+    );
+  }
+
+  ///
+  ///
+  ///
+  Widget _getLinks(List links) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: links
+            .map(
+              (link) => ListTile(
+                leading: Icon(Icons.link),
+                title: Text(link['title']),
+                onTap: () => print(link['sourceUrl']),
+              ),
+            )
+            .toList(),
       ),
     );
   }

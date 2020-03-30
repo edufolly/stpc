@@ -103,49 +103,49 @@ class _LoginState extends State<Login> {
             ),
           ),
           child: StreamBuilder<Status>(
-            stream: _streamController.stream,
-            initialData: Status.loading,
-            builder: (context, snapshot) {
-              switch (snapshot.data) {
-                case Status.loading:
-                  return WaitingMessage('Aguarde...');
-                case Status.form:
-                  return Form(
-                    key: _formKey,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: <Widget>[
-                          /// Image
-                          Image.asset('assets/logo-small.png'),
+              stream: _streamController.stream,
+              initialData: Status.loading,
+              builder: (context, snapshot) {
+                switch (snapshot.data) {
+                  case Status.loading:
+                    return WaitingMessage('Aguarde...');
+                  case Status.form:
+                    return Form(
+                      key: _formKey,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: <Widget>[
+                            /// Image
+                            Image.asset('assets/logo-small.png'),
 
-                          /// Title
-                          Text(
-                            'Simple Tagpacker Client',
-                            style: Theme.of(context).textTheme.headline4,
-                            textAlign: TextAlign.center,
-                          ),
+                            /// Title
+                            Text(
+                              'Simple Tagpacker Client',
+                              style: Theme.of(context).textTheme.headline4,
+                              textAlign: TextAlign.center,
+                            ),
 
-                          /// Message
-                          _error == null || _error.isEmpty
-                              ? Container()
-                              : ClipRRect(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  child: Container(
-                                    padding: EdgeInsets.all(8.0),
-                                    color: Theme.of(context).accentColor,
-                                    child: Center(
-                                      child: Text(
-                                        _error,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 16.0,
+                            /// Message
+                            _error == null || _error.isEmpty
+                                ? Container()
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    child: Container(
+                                      padding: EdgeInsets.all(8.0),
+                                      color: Theme.of(context).accentColor,
+                                      child: Center(
+                                        child: Text(
+                                          _error,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 16.0,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
 
 //                            /// Api
 //                            TextFormField(
@@ -174,52 +174,51 @@ class _LoginState extends State<Login> {
 //                              },
 //                            ),
 
-                          /// User
-                          TextFormField(
-                            key: Key('userTextFormField'),
-                            controller: _userController,
-                            focusNode: _userFocusNode,
-                            keyboardType: TextInputType.text,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            textCapitalization: TextCapitalization.none,
-                            decoration: InputDecoration(
-                              filled: true,
-                              labelText: 'User*',
-                            ),
-                            validator: (value) {
-                              if (value.isEmpty) {
-                                return 'User is necessary.';
-                              }
-                              return null;
-                            },
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) {
-                              _userFocusNode.unfocus();
+                            /// User
+                            TextFormField(
+                              key: Key('userTextFormField'),
+                              controller: _userController,
+                              focusNode: _userFocusNode,
+                              keyboardType: TextInputType.text,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              textCapitalization: TextCapitalization.none,
+                              decoration: InputDecoration(
+                                filled: true,
+                                labelText: 'User*',
+                              ),
+                              validator: (value) {
+                                if (value.isEmpty) {
+                                  return 'User is necessary.';
+                                }
+                                return null;
+                              },
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) {
+                                _userFocusNode.unfocus();
 //                                _config.apiKey = _apiController.text;
-                              _config.userName = _userController.text;
-                              _signIn();
-                            },
-                          ),
-
-                          /// Signin
-                          RaisedButton(
-                            key: Key('signInBtn'),
-                            child: Text(
-                              'Sign in',
+                                _config.userName = _userController.text;
+                                _signIn();
+                              },
                             ),
-                            onPressed: _signIn,
-                          ),
-                        ],
+
+                            /// Signin
+                            RaisedButton(
+                              key: Key('signInBtn'),
+                              child: Text(
+                                'Sign in',
+                              ),
+                              onPressed: _signIn,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                case Status.success:
-                  return WaitingMessage('Redirecionando...');
-              }
-              return WaitingMessage('Aguarde...');
-            },
-          ),
+                    );
+                  case Status.success:
+                    return WaitingMessage('Redirecionando...');
+                }
+                return WaitingMessage('Aguarde...');
+              }),
         ),
       ),
     );
@@ -235,7 +234,9 @@ class _LoginState extends State<Login> {
     //  do the request every time.
     try {
       Map<String, dynamic> data = await MetricHttpClient.doCall(
-          endpoint: 'users?username=${_config.userName}');
+        endpoint: 'users?username=${_config.userName}',
+        log: false,
+      );
 
       if (data['code'] != 200) {
         throw Exception('Sign in error.');
