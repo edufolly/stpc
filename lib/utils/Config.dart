@@ -19,6 +19,7 @@ class Config {
   String userId;
   String name;
   String photoUrl;
+  bool dense = true;
 
   ///
   ///

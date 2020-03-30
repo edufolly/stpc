@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stpc/utils/Config.dart';
 import 'package:stpc/utils/MetricHttpClient.dart';
 import 'package:stpc/utils/WaitingMessage.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'Login.dart';
 
@@ -27,7 +29,7 @@ class Home extends StatefulWidget {
 ///
 class _HomeState extends State<Home> {
   final Config _config = Config();
-  final Map<String, dynamic> packs = {};
+  final SplayTreeMap<String, dynamic> packs = SplayTreeMap();
   StreamController<bool> _streamController;
   SharedPreferences prefs;
 
@@ -58,20 +60,23 @@ class _HomeState extends State<Home> {
 
     List<Map<String, dynamic>> tagsWithoutPack = [];
 
-    Map<String, dynamic> tags = {};
+    SplayTreeMap<String, dynamic> tags = SplayTreeMap();
 
     try {
       for (Map<String, dynamic> link in links) {
         List internalTags = link.remove('tags');
+
         if (internalTags == null || internalTags.isEmpty) {
           linksWithoutTag.add(link);
         } else {
           for (Map<String, dynamic> tag in internalTags) {
             String tagName = tag['name'];
+
             if (!tags.containsKey(tagName)) {
               tag['links'] = [];
               tags[tagName] = tag;
             }
+
             tags[tagName]['links'].add(link);
 
             tags[tagName]['open'] = prefs.containsKey(tags[tagName]['id'])
@@ -83,15 +88,23 @@ class _HomeState extends State<Home> {
 
       for (String key in tags.keys) {
         Map<String, dynamic> tag = tags[key];
+
+        (tag['links'] as List).sort(
+          (a, b) => a['title'].toString().compareTo(b['title'].toString()),
+        );
+
         Map<String, dynamic> pack = tag.remove('pack');
+
         if (pack == null) {
           tagsWithoutPack.add(tag);
         } else {
           String packName = pack['name'];
+
           if (!packs.containsKey(packName)) {
             pack['tags'] = [];
             packs[packName] = pack;
           }
+
           packs[packName]['tags'].add(tag);
 
           packs[packName]['open'] = prefs.containsKey(packs[packName]['id'])
@@ -103,14 +116,23 @@ class _HomeState extends State<Home> {
       print(exception);
     }
 
+    tagsWithoutPack.add({
+      'id': 'tag_$lastPack',
+      'name': 'Other Links',
+      'links': linksWithoutTag,
+      'open': prefs.containsKey('tag_$lastPack')
+          ? prefs.getBool('tag_$lastPack')
+          : false,
+    });
+
     packs[lastPack] = {
       'id': 'pack_$lastPack',
       'name': 'Other Tags',
       'tags': tagsWithoutPack,
-      'open': false,
+      'open': prefs.containsKey('pack_$lastPack')
+          ? prefs.getBool('pack_$lastPack')
+          : false,
     };
-
-//    print('Packs: $packs');
 
     _streamController.add(true);
   }
@@ -136,66 +158,59 @@ class _HomeState extends State<Home> {
           )
         ],
       ),
-      body: Row(
-        children: <Widget>[
-          Flexible(
-            child: Container(),
-          ),
-          Container(
-            width: MediaQuery.of(context).size.width > 1000
-                ? 1000
-                : MediaQuery.of(context).size.width,
-            height: double.infinity,
-            child: Card(
-              child: StreamBuilder<bool>(
-                stream: _streamController.stream,
-                builder: (context, snapshot) {
-                  if (snapshot.hasData) {
-                    if (snapshot.data) {
-                      List<String> keys = packs.keys.toList();
-                      return ListView.separated(
-                        itemBuilder: (context, index) {
-                          Map<String, dynamic> pack = packs[keys[index]];
-                          return ListTile(
-                            leading: Icon(
-                              pack['open']
-                                  ? Icons.keyboard_arrow_down
-                                  : Icons.keyboard_arrow_right,
+      body: Center(
+        child: Container(
+          width: MediaQuery.of(context).size.width > 1000
+              ? 1000
+              : MediaQuery.of(context).size.width,
+          height: double.infinity,
+          child: Card(
+            child: StreamBuilder<bool>(
+              stream: _streamController.stream,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  if (snapshot.data) {
+                    List<String> keys = packs.keys.toList();
+                    return ListView.separated(
+                      itemBuilder: (context, index) {
+                        Map<String, dynamic> pack = packs[keys[index]];
+                        return ListTile(
+                          dense: _config.dense,
+                          leading: Icon(
+                            pack['open']
+                                ? Icons.keyboard_arrow_down
+                                : Icons.keyboard_arrow_right,
+                          ),
+                          title: Padding(
+                            padding: EdgeInsets.only(
+                              top: pack['open'] ? 16.0 : 0.0,
                             ),
-                            title: Padding(
-                              padding: EdgeInsets.only(
-                                top: pack['open'] ? 16.0 : 0.0,
-                              ),
-                              child: Text(pack['name'] ?? 'ERROR'),
-                            ),
-                            subtitle:
-                                pack['open'] ? _getTags(pack['tags']) : null,
-                            onTap: () {
-                              pack['open'] = !pack['open'];
-                              prefs.setBool(pack['id'], pack['open']);
-                              _streamController.add(true);
-                            },
-                          );
-                        },
-                        separatorBuilder: (context, index) => Container(
-                          width: double.infinity,
-                          height: 1,
-                          color: Colors.black26,
-                        ),
-                        itemCount: keys.length,
-                      );
-                    }
+                            child: Text(pack['name'] ?? 'ERROR'),
+                          ),
+                          subtitle:
+                              pack['open'] ? _getTags(pack['tags']) : null,
+                          onTap: () {
+                            pack['open'] = !pack['open'];
+                            prefs.setBool(pack['id'], pack['open']);
+                            _streamController.add(true);
+                          },
+                        );
+                      },
+                      separatorBuilder: (context, index) => Container(
+                        width: double.infinity,
+                        height: 1,
+                        color: Colors.black26,
+                      ),
+                      itemCount: keys.length,
+                    );
                   }
+                }
 
-                  return WaitingMessage('Aguarde...');
-                },
-              ),
+                return WaitingMessage('Aguarde...');
+              },
             ),
           ),
-          Flexible(
-            child: Container(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -208,6 +223,7 @@ class _HomeState extends State<Home> {
       children: tags.map(
         (tag) {
           return ListTile(
+            dense: _config.dense,
             leading: Icon(
               tag['open']
                   ? Icons.keyboard_arrow_down
@@ -244,9 +260,14 @@ class _HomeState extends State<Home> {
         children: links
             .map(
               (link) => ListTile(
+                dense: _config.dense,
                 leading: Icon(Icons.link),
                 title: Text(link['title']),
-                onTap: () => print(link['sourceUrl']),
+                onTap: () async {
+                  if (await canLaunch(link['sourceUrl'])) {
+                    await launch(link['sourceUrl']);
+                  }
+                },
               ),
             )
             .toList(),
