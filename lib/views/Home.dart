@@ -261,7 +261,38 @@ class _HomeState extends State<Home> {
             .map(
               (link) => ListTile(
                 dense: _config.dense,
-                leading: Icon(Icons.link),
+                leading: link['thumbnailUrl'] != null
+                    ? Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.all(
+                            Radius.circular(4.0),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2.0),
+                          child: Image.network(
+                            link['thumbnailUrl'],
+                            height: 24,
+                            width: 24,
+                            fit: BoxFit.cover,
+                            filterQuality: FilterQuality.high,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      )
+                    : Icon(Icons.link),
                 title: Text(link['title']),
                 onTap: () async {
                   if (await canLaunch(link['sourceUrl'])) {
