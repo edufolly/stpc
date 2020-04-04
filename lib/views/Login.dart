@@ -198,7 +198,6 @@ class _LoginState extends State<Login> {
                                 _userFocusNode.unfocus();
 //                                _config.apiKey = _apiController.text;
                                 _config.userName = _userController.text;
-                                _signIn();
                               },
                             ),
 
@@ -208,7 +207,11 @@ class _LoginState extends State<Login> {
                               child: Text(
                                 'Sign in',
                               ),
-                              onPressed: _signIn,
+                              onPressed: () {
+                                if (_formKey.currentState.validate()) {
+                                  _signIn();
+                                }
+                              },
                             ),
                           ],
                         ),
